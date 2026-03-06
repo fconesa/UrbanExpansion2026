@@ -1,0 +1,226 @@
+
+
+
+
+# ================================================================
+# R script 
+# Supplementary data for the paper:
+# "How Much Has Been Lost: 
+# HAssessing the Impact of Urban Expansion on Archaeological Heritage in India and Pakistan 
+# through Machine Learning and Big Data"
+# by Orengo, H.A. et al. 2026
++# R code by @fconesa 2026
+  # ================================================================
+# URBAN IMPACT mounds - FIGURES 
+# ================================================================
+
+# require
+require(ggplot2)
+require(dplyr)
+require(ggExtra)
+
+# ================================================================
+## DATASET #1 (Histogram_export)
+
+# dataset
+histExp <- 20260603_mounds_histogram
+
+# Calculae cumulative counts for each time
+histExp$cumulative_count <- cumsum(histExp$count)
+
+# ================================================================
+# PLOT spatio-temporal trends
+library(scales)  #for alpha
+
+# Pre-filter years for labels
+histExp_labels <- histExp %>% filter(year %% 5 == 0 | year %in% c(1975, 2024))
+
+ggplot(histExp, aes(x = year, y = cumulative_count)) +
+  geom_line(color = "gray40", size = 0.5) +
+  geom_point(color = "gray20", size = 3) +
+  geom_smooth(method = "loess", se = TRUE, fill = "gray70", alpha = 0.2, 
+              color = "darkred", linetype = "dashed", linewidth = 0.5) +
+  geom_label(aes(label = cumulative_count, fill = cumulative_count),
+             vjust = -1,
+             size = 3.5,
+             color = "white", #for contrast
+             fontface = "bold",
+             label.size = 0.3) +
+  scale_x_continuous(
+    breaks = c(seq(1975, 2020, by = 5), 2024)
+  ) +
+  coord_cartesian(xlim = c(1975, 2024)) +
+  scale_fill_gradient(low = "#ffcccc", high = "#990000", name = "Mounded sites") + 
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5, color = "gray20"),
+    axis.title = element_text(size = 14,, color = "gray30"),
+    axis.text = element_text(size = 14, color = "gray40"),
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    legend.position = c(0.98, 0.05),  
+    legend.justification = c(1, 0), 
+    legend.box.background = element_rect(fill = "white", color = NA)) +
+  labs(
+    title = "Cumulative affected sites over time",
+    x = "\n Year",
+    y = "Cumulative count \n")
+
+ggsave("plot_hist_cumulative_v2.jpg", width = 15, height = 10)
+
+
+# ================================================================
+# DATASET #2 (UrbanImpact_mounds)
+
+# dataset
+moundsDF <- 20260603_mounds_reclass
+
+# basic stats
+count(moundsDF)
+head(moundsDF)
+str(moundsDF)
+
+# convert areaPercent in 100% values
+moundsDF$areaPercent <- moundsDF$areaPercent * 100
+
+# convert variables to factor levels
+moundsDF$areaLevels = as.factor(as.character(moundsDF$areaLevels)) # levels
+levels(moundsDF$areaLevels)
+
+# reoder levels
+moundsDF$areaLevels <- factor(moundsDF$areaLevels, levels = c("Low", "Moderate", "High", "Extreme"))
+levels(moundsDF$areaLevels)
+
+# subset and print count observations by group
+tableRisklevels = moundsDF %>% group_by(areaLevels) %>% summarize(num=n())
+tableRisklevels # total endangered mounds
+
+# ================================================================
+# PLOT TEMPORAL HISTOGRAM 
+# calculate counts for each histogram bin
+
+
+# Define histogram bins manually to cover 1970-2024
+breaks_vec <- seq(1970, 2024, by = 10)
+
+moundsDF <- moundsDF %>%
+  mutate(bin = cut(first, breaks = breaks_vec, right = FALSE, include.lowest = TRUE))
+
+# Count per bin
+hist_data <- moundsDF %>%
+  count(bin) %>%
+  # compute bin center correctly
+  mutate(
+    bin_start = as.numeric(sub("\\[|\\)|\\]|\\(", "", sapply(strsplit(as.character(bin), ","), `[`, 1))),
+    bin_end   = as.numeric(sub("\\[|\\)|\\]|\\(", "", sapply(strsplit(as.character(bin), ","), `[`, 2))),
+    bin_center = (bin_start + bin_end) / 2 )  # center of the bin
+
+ggplot(moundsDF, aes(x = first)) +
+  geom_histogram(
+    aes(fill = after_stat(count)),
+    breaks = breaks_vec,  # use manual breaks
+    color = "white") +
+  scale_fill_gradient(low = "#ffcccc", high = "#990000") +
+  scale_x_continuous(breaks = breaks_vec) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  geom_label(
+    data = hist_data,
+    aes(x = bin_center, y = n, label = n, fill = n),
+    vjust = -0.3,
+    size = 3.5,
+    fontface = "bold",
+    color = "white",
+    label.size = 0.3,
+    show.legend = FALSE) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, color = "gray20"),
+    axis.title = element_text(size=14, color = "gray30"), 
+    axis.text = element_text(size=14, color = "gray40"),
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    legend.position = "none") +
+  labs(
+    title = "10-year distribution of mounded sites affected by urban sprawl",
+    x = "\n Years",
+    y = "Count \n")
+
+ggsave("plot_hist_affected.jpg", width = 12, height = 10)
+
+# ================================================================
+# PLOT ENDANGERED PERCENT AREA BY YEARS 
+
+# create new risk score to map colour palette
+# use "AreaPercent" and "First"
+# it shows yearly patterns
+moundsDF <- moundsDF %>%
+  mutate(risk_score = scales::rescale(first) * scales::rescale(areaPercent))
+
+# plot 
+plotArea <- ggplot(moundsDF, aes(x = first, y = areaPercent, color = risk_score, size = areaPercent)) +
+  geom_point() +
+  scale_color_gradient(
+    low = "#ffcccc", high = "#990000", name = "Risk Score",
+    limits = c(0, 1),
+    oob = scales::squish,
+    labels = c("0", "0.25", "0.50", "0.75", "1")) +
+  scale_x_continuous(breaks = seq(1970, 2025, by = 5)) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, color = "gray20"),
+    axis.title = element_text(size=14, color = "gray30"), 
+    axis.text = element_text(size=14, color = "gray40"),
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom", 
+    legend.title = element_text(color = "gray30")
+  ) +
+  labs(
+    title = "Destruction of mounded sites over time by total percent area",
+    x = "\nYear of urban encroachment",
+    y = "% Affected mounded area \n",
+    size = "% Area"
+  )
+plotArea
+
+plotAreaHis <- ggMarginal(plotArea, type="histogram", color = "white")
+plotAreaHis
+
+ggsave("plot_percentYears.jpg", width = 20, height = 10)
+
+
+# ================================================================
+# PLOT RISK LEVELS 
+
+# risk categorical levels to numeric
+tableRisklevels$areaLevels_num <- as.numeric(tableRisklevels$areaLevels)
+
+# plot with gradient color
+tableRisklevels %>% 
+  ggplot(aes(x = areaLevels, y = num, colour = areaLevels_num)) +
+  geom_segment(aes(x = areaLevels, xend = areaLevels, y = 0, yend = num), 
+               linewidth = 0.6, color = "grey30") +
+  geom_point(size = 15) +
+  geom_text(aes(label = num), color = "white", size = 4) +
+  scale_color_gradient(low = "#ffcccc", high = "#990000", name = "Risk Level") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, color = "gray20"),
+    axis.title = element_text(size = 14, color = "gray30"), 
+    axis.text = element_text(size = 14, color = "gray40"),
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(
+    title = "Building and road encroachment in detected mounds",
+    x = "Impact \n",
+    y = "\n Count")
+
+ggsave("plot_RiskLevels.jpg", width = 12, height = 10)
+
+
+# ================================================================
+# END
