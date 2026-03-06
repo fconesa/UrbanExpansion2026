@@ -3,6 +3,7 @@
 Supplementary Materials to accompany the paper
 
 Assessing the Impact of Urban Expansion on Archaeological Heritage in India and Pakistan through Machine Learning and Big Data
+
 By Orengo HA; Berganzo-Besga I; Conesa FC; Lumbreras F; Roberts RC; Petrie CA
  
 Link to the original publication -> tba
@@ -16,6 +17,7 @@ R script:
 Datasets:
 
 20260603_mounds_histogram.csv -> frequency table with total count of affected mounds by years
+
 20260603_mounds_reclass.csv -> mound database with urban detection outputs from Google Earth Engine
 
 
